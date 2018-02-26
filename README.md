@@ -11,20 +11,24 @@ Convert PDF files into images using Poppler with promises. It achieves 10x faste
 
 ## Usage
 
+### Get pdf info
+
 ```javascript
-const pdfpoppler = require('pdf-poppler');
+const pdf = require('pdf-poppler');
 
 let file = 'C:\\tmp\\convertme.pdf'
 
-pdfpoppler.info(file)
+pdf.info(file)
     .then(pdfinfo => {
         console.log(pdfinfo);
     });
 ```
 
+### Convert pdf into image
+
 ```javascript
 const path = require('path');
-const pdfpoppler = require('pdf-poppler');
+const pdf = require('pdf-poppler');
 
 let file = 'C:\\tmp\\convertme.pdf'
 
@@ -35,7 +39,7 @@ let opts = {
     page: null
 }
 
-pdfpoppler.convert(file, opts)
+pdf.convert(file, opts)
     .then(res => {
         console.log('Successfully converted');
     })
