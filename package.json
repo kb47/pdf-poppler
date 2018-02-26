@@ -1,6 +1,6 @@
 {
   "name": "pdf-poppler",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Convert PDF files into images using Poppler with promises. It achieves 10x faster performance compared to other PDF converters.",
   "main": "index.js",
   "scripts": {
@@ -18,12 +18,11 @@
     "png",
     "tiff",
     "tif",
-    "parse pdf info",
-    "pdf to image",
+    "parse",
+    "info",
+    "image",
     "pdf2image",
     "pdf2img",
-    "high performance pdf conversion",
-    "convert pdf to images",
     "electron"
   ],
   "author": "Khishigbaatar N. <kb@2xcoding.com>",
