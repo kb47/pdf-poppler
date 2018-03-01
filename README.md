@@ -1,8 +1,9 @@
 # pdf-poppler
 
 Convert PDF files into images using Poppler with promises. It achieves 10x faster performance compared to other PDF converters.
+Poppler library attached inside statically, so it has not require installation of poppler.
 
-**Note: Currently it works on Windows only.**
+**Note: Currently it supports for Windows and Mac OS only.**
 
 ## Installation
 ```
