@@ -32,6 +32,9 @@ else {
     process.exit(1);
 }
 
+// for electron ASAR
+popplerPath = popplerPath.replace(".asar", ".asar.unpacked");
+
 module.exports.path = popplerPath;
 module.exports.info = require('./lib/info');
 module.exports.convert = require('./lib/convert');
