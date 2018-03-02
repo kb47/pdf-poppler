@@ -42,11 +42,21 @@ else if (platform === 'darwin') {
         'lib'
     );
 
+    let libRoot = path.join(
+        __dirname,
+        'lib',
+        'osx'
+    );
+
     // for electron ASAR
     popplerPath = popplerPath.replace(".asar", ".asar.unpacked");
     dyldPath = dyldPath.replace(".asar", ".asar.unpacked");
+    libRoot = libRoot.replace(".asar", ".asar.unpacked");
 
     execOptions = {encoding: 'utf8', shell: process.env.SHELL, DYLD_LIBRARY_PATH: dyldPath };
+
+    // make files executable
+    spawn('chmod', ['-R', '755', `${libRoot}`]);
 
     // change name for every executables
     spawn('install_name_tool', ['-change', `/usr/local/Cellar/poppler/0.62.0/lib/libpoppler.73.dylib`, `${path.join(dyldPath, 'libpoppler.73.0.0.dylib')}`, `${path.join(popplerPath, 'pdfinfo')}`]);
