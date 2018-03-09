@@ -9,7 +9,12 @@ if (!['darwin', 'win32'].includes(platform)) {
 }
 
 let popplerPath;
-let execOptions;
+
+let execOptions = {
+    encoding: 'utf8',
+    maxBuffer: 5000*1024,
+    shell: process.env.SHELL,
+};
 
 if (platform === 'win32') {
     popplerPath = path.join(
@@ -22,8 +27,6 @@ if (platform === 'win32') {
 
     // for electron ASAR
     popplerPath = popplerPath.replace(".asar", ".asar.unpacked");
-
-    execOptions = {encoding: 'utf8', shell: process.env.SHELL};
 }
 else if (platform === 'darwin') {
     popplerPath = path.join(
@@ -53,14 +56,13 @@ else if (platform === 'darwin') {
     dyldPath = dyldPath.replace(".asar", ".asar.unpacked");
     libRoot = libRoot.replace(".asar", ".asar.unpacked");
 
-    execOptions = {encoding: 'utf8', shell: process.env.SHELL, DYLD_LIBRARY_PATH: dyldPath };
-
     // make files executable
     spawn('chmod', ['-R', '755', `${libRoot}`]);
 
     // change name for every executables
     spawn('install_name_tool', ['-change', `/usr/local/Cellar/poppler/0.62.0/lib/libpoppler.73.dylib`, `${path.join(dyldPath, 'libpoppler.73.0.0.dylib')}`, `${path.join(popplerPath, 'pdfinfo')}`]);
     spawn('install_name_tool', ['-change', `/usr/local/Cellar/poppler/0.62.0/lib/libpoppler.73.dylib`, `${path.join(dyldPath, 'libpoppler.73.0.0.dylib')}`, `${path.join(popplerPath, 'pdftocairo')}`]);
+    spawn('install_name_tool', ['-change', `/usr/local/Cellar/poppler/0.62.0/lib/libpoppler.73.dylib`, `${path.join(dyldPath, 'libpoppler.73.0.0.dylib')}`, `${path.join(popplerPath, 'pdfimages')}`]);
 }
 else {
     console.error(`${platform} is NOT supported.`);
@@ -70,4 +72,5 @@ else {
 module.exports.path = popplerPath;
 module.exports.exec_options = execOptions;
 module.exports.info = require('./lib/info');
+module.exports.imgdata = require('./lib/imgdata');
 module.exports.convert = require('./lib/convert');
