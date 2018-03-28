@@ -13,7 +13,7 @@ let popplerPath;
 let execOptions = {
     encoding: 'utf8',
     maxBuffer: 5000*1024,
-    shell: process.env.SHELL,
+    shell: false
 };
 
 if (platform === 'win32') {
