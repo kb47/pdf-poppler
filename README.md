@@ -36,7 +36,7 @@ let file = 'C:\\tmp\\convertme.pdf'
 let opts = {
     format: 'jpeg',
     out_dir: path.dirname(file),
-    out_prefix: path.baseName(file, path.extname(file)),
+    out_prefix: path.basename(file, path.extname(file)),
     page: null
 }
 
