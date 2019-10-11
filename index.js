@@ -21,7 +21,7 @@ if (platform === 'win32') {
         __dirname,
         'lib',
         'win',
-        'poppler-0.51',
+        'poppler-0.68',
         'bin'
     );
 
