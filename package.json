@@ -1,15 +1,7 @@
 {
   "name": "pdf-poppler",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Convert PDF files into images using Poppler with promises. It achieves 10x faster performance compared to other PDF converters. \nPoppler library attached inside statically, so it has not require installation of poppler.",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/kb47/pdf-poppler.git"
-  },
   "keywords": [
     "pdf",
     "poppler",
@@ -25,6 +17,31 @@
     "pdf2img",
     "electron"
   ],
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint \"lib/*.js\""
+  },
   "author": "Khishigbaatar N. <kb@2xcoding.com>",
-  "license": "ISC"
+  "contributors": [
+    "Frazer Smith <frazer.smith@ydh.nhs.uk>"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "coveralls": "^3.0.6",
+    "eslint": "^6.5.1",
+    "eslint-config-airbnb-base": "^14.0.0",
+    "eslint-config-nhsuk": "^1.0.0",
+    "eslint-plugin-import": "^2.18.2",
+    "eslint-plugin-jest": "^22.17.0",
+    "eslint-plugin-json": "^1.4.0",
+    "jest": "^24.9.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kb47/pdf-poppler.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kb47/pdf-poppler/issues"
+  }
 }
