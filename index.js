@@ -3,7 +3,7 @@ const path = require('path');
 const {spawn} = require('child_process');
 
 let platform = os.platform();
-if (!['darwin', 'win32'].includes(platform)) {
+if (!['darwin', 'win32', 'linux'].includes(platform)) {
     console.error(`${platform} is NOT supported.`);
     process.exit(1);
 }
@@ -33,7 +33,7 @@ else if (platform === 'darwin') {
         __dirname,
         'lib',
         'osx',
-        'poppler-0.66',
+        'poppler-latest',
         'bin'
     );
 
@@ -41,7 +41,7 @@ else if (platform === 'darwin') {
         __dirname,
         'lib',
         'osx',
-        'poppler-0.66',
+        'poppler-latest',
         'lib'
     );
 
@@ -63,6 +63,49 @@ else if (platform === 'darwin') {
     spawn('install_name_tool', ['-change', `/usr/local/Cellar/poppler/0.66.0/lib/libpoppler.77.dylib`, `${path.join(dyldPath, 'libpoppler.77.0.0.dylib')}`, `${path.join(popplerPath, 'pdfinfo')}`]);
     spawn('install_name_tool', ['-change', `/usr/local/Cellar/poppler/0.66.0/lib/libpoppler.77.dylib`, `${path.join(dyldPath, 'libpoppler.77.0.0.dylib')}`, `${path.join(popplerPath, 'pdftocairo')}`]);
     spawn('install_name_tool', ['-change', `/usr/local/Cellar/poppler/0.66.0/lib/libpoppler.77.dylib`, `${path.join(dyldPath, 'libpoppler.77.0.0.dylib')}`, `${path.join(popplerPath, 'pdfimages')}`]);
+}
+else if (platform === 'linux') {
+    // Check if running in AWS Lambda environment
+    if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        // In Lambda, try to use binaries from /opt (Lambda Layer) first
+        if (require('fs').existsSync('/opt/bin/pdftocairo')) {
+            popplerPath = '/opt/bin';
+        } else {
+            // Fallback to bundled binaries
+            popplerPath = path.join(
+                __dirname,
+                'lib',
+                'linux',
+                'poppler-latest',
+                'bin'
+            );
+        }
+    } else {
+        popplerPath = path.join(
+            __dirname,
+            'lib',
+            'linux',
+            'poppler-latest',
+            'bin'
+        );
+    }
+
+    // for electron ASAR
+    popplerPath = popplerPath.replace(".asar", ".asar.unpacked");
+
+    let libRoot = path.join(
+        __dirname,
+        'lib',
+        'linux'
+    );
+
+    // for electron ASAR
+    libRoot = libRoot.replace(".asar", ".asar.unpacked");
+
+    // make files executable (only for bundled binaries, not Lambda Layer)
+    if (!process.env.AWS_LAMBDA_FUNCTION_NAME || !require('fs').existsSync('/opt/bin/pdftocairo')) {
+        spawn('chmod', ['-R', '755', `${libRoot}`]);
+    }
 }
 else {
     console.error(`${platform} is NOT supported.`);

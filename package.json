@@ -1,10 +1,12 @@
 {
   "name": "pdf-poppler",
   "version": "0.2.1",
-  "description": "Convert PDF files into images using Poppler with promises. It achieves 10x faster performance compared to other PDF converters. \nPoppler library attached inside statically, so it has not require installation of poppler.",
+  "description": "Convert PDF files into images using Poppler with promises. It achieves 10x faster performance compared to other PDF converters. \nPoppler library attached inside statically, so it has not require installation of poppler. Supports Windows, macOS, and Linux including AWS Lambda.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "repository": {
     "type": "git",
@@ -23,8 +25,20 @@
     "image",
     "pdf2image",
     "pdf2img",
-    "electron"
+    "electron",
+    "lambda",
+    "aws",
+    "linux",
+    "serverless"
   ],
   "author": "Khishigbaatar N. <kb@2xcoding.com>",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.5.0",
+    "typescript": "^5.0.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0"
+  }
 }
