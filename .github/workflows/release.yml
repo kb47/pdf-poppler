@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 1.0.0)'
+        required: false
+        default: 'latest'
+
+jobs:
+  test-release:
+    name: Test Release on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 18, 20]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run comprehensive tests
+      run: npm test
+      env:
+        CI: true
+
+    - name: Test installation as package
+      run: |
+        cd ..
+        mkdir test-install
+        cd test-install
+        npm init -y
+        npm install ../pdf-poppler
+
+        # Create test file
+        cat > test.js << 'EOF'
+        const poppler = require('pdf-poppler');
+        console.log('Package installed successfully');
+        console.log('Poppler path:', poppler.path);
+        console.log('Available methods:', Object.keys(poppler));
+        EOF
+
+        node test.js
+
+    - name: Test package integrity
+      run: |
+        echo "Testing package structure..."
+
+        # Check main files exist
+        test -f index.js || (echo "index.js missing" && exit 1)
+        test -f package.json || (echo "package.json missing" && exit 1)
+
+        # Check lib directory
+        test -d lib || (echo "lib directory missing" && exit 1)
+        test -f lib/info.js || (echo "lib/info.js missing" && exit 1)
+        test -f lib/convert.js || (echo "lib/convert.js missing" && exit 1)
+        test -f lib/imgdata.js || (echo "lib/imgdata.js missing" && exit 1)
+
+        # Check platform-specific binaries
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          test -d lib/linux || (echo "Linux binaries missing" && exit 1)
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          test -d lib/osx || (echo "macOS binaries missing" && exit 1)
+        elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          test -d lib/win || (echo "Windows binaries missing" && exit 1)
+        fi
+
+        echo "Package structure validation passed"
+
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: test-release
+    if: github.event_name == 'release'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Publish to NPM
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  create-github-release-assets:
+    name: Create Release Assets
+    runs-on: ubuntu-latest
+    needs: test-release
+    if: github.event_name == 'release'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Create package tarball
+      run: npm pack
+
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./pdf-poppler-*.tgz
+        asset_name: pdf-poppler-${{ github.event.release.tag_name }}.tgz
+        asset_content_type: application/gzip

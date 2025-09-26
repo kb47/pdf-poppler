@@ -1,0 +1,214 @@
+name: Performance Testing
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: Benchmark on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run benchmark tests
+      run: |
+        node -e "
+        const poppler = require('./index.js');
+        const fs = require('fs');
+
+        (async () => {
+          console.log('=== PDF-Poppler Performance Benchmark ===');
+          console.log('Platform:', process.platform);
+          console.log('Node.js:', process.version);
+          console.log('PDF file size:', fs.statSync('sample.pdf').size, 'bytes');
+          console.log('');
+
+          const results = {};
+
+          // Benchmark PDF Info extraction
+          console.log('Benchmarking PDF Info extraction...');
+          const infoTimes = [];
+          for (let i = 0; i < 10; i++) {
+            const start = performance.now();
+            await poppler.info('sample.pdf');
+            const end = performance.now();
+            infoTimes.push(end - start);
+          }
+          results.info = {
+            avg: infoTimes.reduce((a, b) => a + b) / infoTimes.length,
+            min: Math.min(...infoTimes),
+            max: Math.max(...infoTimes)
+          };
+
+          // Benchmark Image Data extraction
+          console.log('Benchmarking Image Data extraction...');
+          const imgDataTimes = [];
+          for (let i = 0; i < 5; i++) {
+            const start = performance.now();
+            await poppler.imgdata('sample.pdf');
+            const end = performance.now();
+            imgDataTimes.push(end - start);
+          }
+          results.imgdata = {
+            avg: imgDataTimes.reduce((a, b) => a + b) / imgDataTimes.length,
+            min: Math.min(...imgDataTimes),
+            max: Math.max(...imgDataTimes)
+          };
+
+          // Benchmark PNG conversion
+          console.log('Benchmarking PNG conversion...');
+          const pngTimes = [];
+          for (let i = 0; i < 3; i++) {
+            const start = performance.now();
+            await poppler.convert('sample.pdf', {
+              format: 'png',
+              out_dir: './test-output',
+              out_prefix: 'perf-png-' + i,
+              page: 1
+            });
+            const end = performance.now();
+            pngTimes.push(end - start);
+          }
+          results.png_conversion = {
+            avg: pngTimes.reduce((a, b) => a + b) / pngTimes.length,
+            min: Math.min(...pngTimes),
+            max: Math.max(...pngTimes)
+          };
+
+          // Benchmark JPEG conversion
+          console.log('Benchmarking JPEG conversion...');
+          const jpegTimes = [];
+          for (let i = 0; i < 3; i++) {
+            const start = performance.now();
+            await poppler.convert('sample.pdf', {
+              format: 'jpeg',
+              out_dir: './test-output',
+              out_prefix: 'perf-jpeg-' + i,
+              page: 1
+            });
+            const end = performance.now();
+            jpegTimes.push(end - start);
+          }
+          results.jpeg_conversion = {
+            avg: jpegTimes.reduce((a, b) => a + b) / jpegTimes.length,
+            min: Math.min(...jpegTimes),
+            max: Math.max(...jpegTimes)
+          };
+
+          // Display results
+          console.log('');
+          console.log('=== BENCHMARK RESULTS ===');
+          console.log('PDF Info Extraction:');
+          console.log('  Average:', results.info.avg.toFixed(2) + 'ms');
+          console.log('  Min:', results.info.min.toFixed(2) + 'ms');
+          console.log('  Max:', results.info.max.toFixed(2) + 'ms');
+
+          console.log('Image Data Extraction:');
+          console.log('  Average:', results.imgdata.avg.toFixed(2) + 'ms');
+          console.log('  Min:', results.imgdata.min.toFixed(2) + 'ms');
+          console.log('  Max:', results.imgdata.max.toFixed(2) + 'ms');
+
+          console.log('PNG Conversion:');
+          console.log('  Average:', results.png_conversion.avg.toFixed(2) + 'ms');
+          console.log('  Min:', results.png_conversion.min.toFixed(2) + 'ms');
+          console.log('  Max:', results.png_conversion.max.toFixed(2) + 'ms');
+
+          console.log('JPEG Conversion:');
+          console.log('  Average:', results.jpeg_conversion.avg.toFixed(2) + 'ms');
+          console.log('  Min:', results.jpeg_conversion.min.toFixed(2) + 'ms');
+          console.log('  Max:', results.jpeg_conversion.max.toFixed(2) + 'ms');
+
+          // Performance thresholds (fail if exceeded)
+          const thresholds = {
+            info: 2000, // 2 seconds
+            imgdata: 5000, // 5 seconds
+            png_conversion: 10000, // 10 seconds
+            jpeg_conversion: 10000 // 10 seconds
+          };
+
+          let failed = false;
+          Object.keys(thresholds).forEach(key => {
+            if (results[key].avg > thresholds[key]) {
+              console.error('PERFORMANCE THRESHOLD EXCEEDED:', key, 'average time', results[key].avg.toFixed(2) + 'ms', 'exceeds threshold of', thresholds[key] + 'ms');
+              failed = true;
+            }
+          });
+
+          if (failed) {
+            console.error('Performance benchmarks failed!');
+            process.exit(1);
+          } else {
+            console.log('All performance benchmarks passed!');
+          }
+
+          // Save results for comparison
+          const benchmarkData = {
+            platform: process.platform,
+            node_version: process.version,
+            timestamp: new Date().toISOString(),
+            results: results
+          };
+
+          fs.writeFileSync('benchmark-results.json', JSON.stringify(benchmarkData, null, 2));
+          console.log('Benchmark results saved to benchmark-results.json');
+        })();
+        "
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results-${{ matrix.os }}
+        path: benchmark-results.json
+        retention-days: 30
+
+    - name: Comment PR with benchmark results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          if (fs.existsSync('benchmark-results.json')) {
+            const results = JSON.parse(fs.readFileSync('benchmark-results.json', 'utf8'));
+
+            const body = `
+            ## 📊 Performance Benchmark Results (${{ matrix.os }})
+
+            | Operation | Average | Min | Max |
+            |-----------|---------|-----|-----|
+            | PDF Info | ${results.results.info.avg.toFixed(2)}ms | ${results.results.info.min.toFixed(2)}ms | ${results.results.info.max.toFixed(2)}ms |
+            | Image Data | ${results.results.imgdata.avg.toFixed(2)}ms | ${results.results.imgdata.min.toFixed(2)}ms | ${results.results.imgdata.max.toFixed(2)}ms |
+            | PNG Conversion | ${results.results.png_conversion.avg.toFixed(2)}ms | ${results.results.png_conversion.min.toFixed(2)}ms | ${results.results.png_conversion.max.toFixed(2)}ms |
+            | JPEG Conversion | ${results.results.jpeg_conversion.avg.toFixed(2)}ms | ${results.results.jpeg_conversion.min.toFixed(2)}ms | ${results.results.jpeg_conversion.max.toFixed(2)}ms |
+
+            **Platform:** ${results.platform}
+            **Node.js:** ${results.node_version}
+            **Timestamp:** ${results.timestamp}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+          }

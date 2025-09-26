@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main, develop ]
+  pull_request:
+    branches: [ master, main, develop ]
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with Node.js ${{ matrix.node-version }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 18, 20]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Verify binary files exist
+      shell: bash
+      run: |
+        echo "Checking binary directories..."
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          echo "Linux platform detected"
+          ls -la lib/linux/ || echo "Linux lib directory not found"
+          ls -la lib/linux/poppler-latest/bin/ || echo "Linux binaries not found"
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          echo "macOS platform detected"
+          ls -la lib/osx/ || echo "macOS lib directory not found"
+          ls -la lib/osx/poppler-latest/bin/ || echo "macOS binaries not found"
+        elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          echo "Windows platform detected"
+          ls -la lib/win/ || echo "Windows lib directory not found"
+          ls -la lib/win/poppler-0.51/bin/ || echo "Windows binaries not found"
+        fi
+
+    - name: Make binaries executable (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+          chmod +x lib/linux/poppler-latest/bin/* || echo "Failed to make Linux binaries executable"
+        elif [[ "${{ matrix.os }}" == "macos-latest" ]]; then
+          chmod +x lib/osx/poppler-latest/bin/* || echo "Failed to make macOS binaries executable"
+        fi
+
+    - name: Test binary execution (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        echo "Testing Linux binaries..."
+        ./lib/linux/poppler-latest/bin/pdfinfo -v || echo "pdfinfo version check failed"
+
+    - name: Test binary execution (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        echo "Testing macOS binaries..."
+        ./lib/osx/poppler-latest/bin/pdfinfo -v || echo "pdfinfo version check failed"
+
+    - name: Test binary execution (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: cmd
+      run: |
+        echo Testing Windows binaries...
+        lib\win\poppler-0.51\bin\pdfinfo.exe -v || echo pdfinfo version check failed
+
+    - name: Run tests
+      run: npm test
+      env:
+        CI: true
+
+    - name: Test with sample PDF
+      run: |
+        node -e "
+        const poppler = require('./index.js');
+        console.log('Platform:', process.platform);
+        console.log('Poppler path:', poppler.path);
+
+        (async () => {
+          try {
+            const info = await poppler.info('sample.pdf');
+            console.log('PDF Info test passed - Pages:', info.pages);
+
+            const imageData = await poppler.imgdata('sample.pdf');
+            console.log('Image data test passed - Found', imageData.length, 'images');
+
+            console.log('All basic functionality tests passed!');
+          } catch (error) {
+            console.error('Functionality test failed:', error.message);
+            process.exit(1);
+          }
+        })();
+        "
+
+    - name: Upload test artifacts
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-output-${{ matrix.os }}-node${{ matrix.node-version }}
+        path: |
+          test-output/
+          *.png
+          *.jpg
+          *.jpeg
+        retention-days: 7

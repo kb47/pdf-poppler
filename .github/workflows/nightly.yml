@@ -1,0 +1,197 @@
+name: Nightly Tests
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  extended-tests:
+    name: Extended Tests on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node-version: [16, 18, 20, 21]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run tests with coverage
+      run: npm run test:coverage
+      env:
+        CI: true
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: ${{ matrix.os }}-node${{ matrix.node-version }}
+        name: codecov-${{ matrix.os }}-node${{ matrix.node-version }}
+
+    - name: Performance benchmarks
+      run: |
+        node -e "
+        const poppler = require('./index.js');
+        const fs = require('fs');
+
+        (async () => {
+          console.log('Running performance benchmarks...');
+
+          // Test PDF info extraction speed
+          const startInfo = Date.now();
+          for (let i = 0; i < 10; i++) {
+            await poppler.info('sample.pdf');
+          }
+          const infoTime = Date.now() - startInfo;
+          console.log('PDF Info (10x):', infoTime + 'ms', 'avg:', (infoTime/10) + 'ms');
+
+          // Test image conversion speed
+          const startConvert = Date.now();
+          await poppler.convert('sample.pdf', {
+            format: 'png',
+            out_dir: './test-output',
+            out_prefix: 'benchmark',
+            page: 1
+          });
+          const convertTime = Date.now() - startConvert;
+          console.log('PNG Conversion:', convertTime + 'ms');
+
+          // Test image data extraction speed
+          const startImgData = Date.now();
+          await poppler.imgdata('sample.pdf');
+          const imgDataTime = Date.now() - startImgData;
+          console.log('Image Data Extraction:', imgDataTime + 'ms');
+
+          console.log('Performance benchmarks completed');
+        })();
+        "
+
+    - name: Memory usage test
+      run: |
+        node -e "
+        const poppler = require('./index.js');
+
+        (async () => {
+          const initialMemory = process.memoryUsage();
+          console.log('Initial memory:', initialMemory);
+
+          // Run multiple operations
+          for (let i = 0; i < 50; i++) {
+            await poppler.info('sample.pdf');
+            if (i % 10 === 0) {
+              const currentMemory = process.memoryUsage();
+              console.log('Memory after', i, 'operations:', currentMemory);
+            }
+          }
+
+          const finalMemory = process.memoryUsage();
+          console.log('Final memory:', finalMemory);
+
+          const heapGrowth = finalMemory.heapUsed - initialMemory.heapUsed;
+          console.log('Heap growth:', heapGrowth, 'bytes');
+
+          if (heapGrowth > 50 * 1024 * 1024) { // 50MB threshold
+            console.error('Potential memory leak detected');
+            process.exit(1);
+          }
+
+          console.log('Memory usage test passed');
+        })();
+        "
+
+    - name: Stress test
+      run: |
+        node -e "
+        const poppler = require('./index.js');
+
+        (async () => {
+          console.log('Running stress test...');
+
+          // Concurrent operations
+          const promises = [];
+          for (let i = 0; i < 20; i++) {
+            promises.push(poppler.info('sample.pdf'));
+          }
+
+          const results = await Promise.all(promises);
+          console.log('Concurrent info extraction completed:', results.length, 'results');
+
+          // Rapid sequential operations
+          for (let i = 0; i < 100; i++) {
+            await poppler.info('sample.pdf');
+          }
+
+          console.log('Stress test completed successfully');
+        })();
+        "
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+
+    - name: Check for known vulnerabilities
+      run: |
+        # Check if any high/critical vulnerabilities exist
+        if npm audit --audit-level high --json | grep -q '"level": "high\|critical"'; then
+          echo "High or critical vulnerabilities found"
+          npm audit --audit-level high
+          exit 1
+        else
+          echo "No high or critical vulnerabilities found"
+        fi
+
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [extended-tests, security-scan]
+    if: failure()
+
+    steps:
+    - name: Create Issue on Failure
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: 'Nightly Tests Failed - ' + new Date().toISOString().split('T')[0],
+            body: `
+            The nightly tests have failed. Please check the workflow run for details:
+
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            **Date:** ${new Date().toISOString()}
+            **Commit:** ${{ github.sha }}
+
+            Please investigate and fix the issues.
+            `,
+            labels: ['bug', 'ci-failure', 'nightly-tests']
+          })
